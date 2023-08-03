@@ -22,6 +22,8 @@ class TelegramBridge extends BridgeAbstract
         'https://telegram.me/s/rssbridge' => ['username' => 'rssbridge'],
         'https://telegram.me/rssbridge' => ['username' => 'rssbridge'],
         'http://telegram.me/rssbridge' => ['username' => 'rssbridge'],
+        'http://rssbridge.t.me/' => ['username' => 'rssbridge'],
+        'https://rssbridge.t.me/' => ['username' => 'rssbridge'],
     ];
 
     const CACHE_TIMEOUT = 60 * 15; // 15 mins
@@ -167,11 +169,19 @@ EOD;
             $stickerDiv->find('picture', 0)->style = '';
 
             return $stickerDiv;
-        } elseif (preg_match(self::BACKGROUND_IMAGE_REGEX, $stickerDiv->find('i', 0)->style, $sticker)) {
-            return <<<EOD
+        }
+
+        $var = $stickerDiv->find('i', 0);
+        if ($var) {
+            $style = $var->style;
+            if (preg_match(self::BACKGROUND_IMAGE_REGEX, $style, $sticker)) {
+                return <<<EOD
 				<a href="{$stickerDiv->children(0)->herf}"><img src="{$sticker[1]}"></a>
 EOD;
+            }
         }
+
+        return '';
     }
 
     private function processPoll($messageDiv)
@@ -360,10 +370,17 @@ EOD;
 
     public function detectParameters($url)
     {
-        $detectParamsRegex = '/^https?:\/\/(?:t|telegram)\.me\/(?:s\/)?([\w]+)$/';
+        $detectParamsRegex = '/^https?:\/\/(?:(?:t|telegram)\.me\/(?:s\/)?([\w]+)|([\w]+)\.t\.me\/?)$/';
         $params = [];
         if (preg_match($detectParamsRegex, $url, $matches) > 0) {
-            $params['username'] = $matches[1];
+            if ($matches[1] !== '') {
+                $params['username'] = $matches[1];
+            }
+
+            if (isset($matches[2]) && $matches[2] !== '') {
+                $params['username'] = $matches[2];
+            }
+
             return $params;
         }
         return null;

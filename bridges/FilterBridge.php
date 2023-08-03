@@ -16,7 +16,7 @@ class FilterBridge extends FeedExpander
             'required' => true,
         ],
         'filter' => [
-            'name' => 'Filter (regular expression)',
+            'name' => 'Filter (regular expression!!!)',
             'required' => false,
         ],
         'filter_type' => [
@@ -39,19 +39,24 @@ class FilterBridge extends FeedExpander
             'type' => 'checkbox',
             'required' => false,
         ],
-        'target_title' => [
-            'name' => 'Apply filter on title',
+        'target_author' => [
+            'name' => 'Apply filter on author',
             'type' => 'checkbox',
             'required' => false,
-            'defaultValue' => 'checked'
         ],
         'target_content' => [
             'name' => 'Apply filter on content',
             'type' => 'checkbox',
             'required' => false,
         ],
-        'target_author' => [
-            'name' => 'Apply filter on author',
+        'target_title' => [
+            'name' => 'Apply filter on title',
+            'type' => 'checkbox',
+            'required' => false,
+            'defaultValue' => 'checked'
+        ],
+        'target_uri' => [
+            'name' => 'Apply filter on URI/URL',
             'type' => 'checkbox',
             'required' => false,
         ],
@@ -75,29 +80,46 @@ class FilterBridge extends FeedExpander
         // Generate title from first 50 characters of content?
         if ($this->getInput('title_from_content') && array_key_exists('content', $item)) {
             $content = str_get_html($item['content']);
-            $pos = strpos($item['content'], ' ', 50);
-            $item['title'] = substr($content->plaintext, 0, $pos);
-            if (strlen($content->plaintext) >= $pos) {
-                $item['title'] .= '...';
+            $plaintext = $content->plaintext;
+            if (mb_strlen($plaintext) < 51) {
+                $item['title'] = $plaintext;
+            } else {
+                $pos = strpos($item['content'], ' ', 50);
+                $item['title'] = substr($plaintext, 0, $pos);
+                if (strlen($plaintext) >= $pos) {
+                    $item['title'] .= '...';
+                }
             }
         }
 
-        // Build regular expression
-        $regex = '/' . $this->getInput('filter') . '/';
+        $filter = $this->getInput('filter');
+        if (! str_contains($filter, '#')) {
+            $delimiter = '#';
+        } elseif (! str_contains($filter, '/')) {
+            $delimiter = '/';
+        } else {
+            throw new \Exception('Cannot use both / and # inside filter');
+        }
+
+        $regex = $delimiter . $filter . $delimiter;
         if ($this->getInput('case_insensitive')) {
             $regex .= 'i';
         }
 
         // Retrieve fields to check
         $filter_fields = [];
-        if ($this->getInput('target_title')) {
-            $filter_fields[] = $item['title'] ?? null;
+        if ($this->getInput('target_author')) {
+            $filter_fields[] = $item['author'] ?? null;
         }
         if ($this->getInput('target_content')) {
             $filter_fields[] = $item['content'] ?? null;
         }
-        if ($this->getInput('target_author')) {
-            $filter_fields[] = $item['author'] ?? null;
+        if ($this->getInput('target_title')) {
+            $filter_fields[] = $item['title'] ?? null;
+        }
+        if ($this->getInput('target_uri')) {
+            // todo: maybe consider 'http' and 'https' equivalent? Also maybe optionally .www subdomain?
+            $filter_fields[] = $item['uri'] ?? null;
         }
 
         // Apply filter on item
@@ -107,7 +129,11 @@ class FilterBridge extends FeedExpander
             if ($length_limit > 0) {
                 $field = substr($field, 0, $length_limit);
             }
-            $keep_item |= boolval(preg_match($regex, $field));
+            $result = preg_match($regex, $field);
+            if ($result === false) {
+                // todo: maybe notify user about the error here?
+            }
+            $keep_item |= boolval($result);
             if ($this->getInput('fix_encoding')) {
                 $keep_item |= boolval(preg_match($regex, utf8_decode($field)));
                 $keep_item |= boolval(preg_match($regex, utf8_encode($field)));

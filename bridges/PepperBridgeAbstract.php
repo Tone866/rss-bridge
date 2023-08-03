@@ -71,7 +71,6 @@ class PepperBridgeAbstract extends BridgeAbstract
         $selectorHot = implode(
             ' ', /* Notice this is a space! */
             [
-                'cept-vote-box',
                 'vote-box'
             ]
         );
@@ -95,7 +94,7 @@ class PepperBridgeAbstract extends BridgeAbstract
         );
 
         // If there is no results, we don't parse the content because it display some random deals
-        $noresult = $html->find('h3[class=size--all-l size--fromW2-xl size--fromW3-xxl]', 0);
+        $noresult = $html->find('h3[class=size--all-l]', 0);
         if ($noresult != null && strpos($noresult->plaintext, $this->i8n('no-results')) !== false) {
             $this->items = [];
         } else {
@@ -119,7 +118,7 @@ class PepperBridgeAbstract extends BridgeAbstract
                     . $deal->find('div[class*=' . $selectorDescription . ']', 0)->innertext
                     . '</td><td>'
                     . $deal->find('div[class*=' . $selectorHot . ']', 0)
-                        ->find('span', 1)->outertext
+                        ->find('span', 0)->outertext
                     . '</td></table>';
 
                 // Check if a clock icon is displayed on the deal
@@ -130,7 +129,7 @@ class PepperBridgeAbstract extends BridgeAbstract
 
                     // Find the text corresponding to the clock
                     $spanDateDiv = $clock->parent()->find('span[class=hide--toW3]', 0);
-                    $itemDate = $spanDateDiv->plaintext;
+                    $itemDate = $spanDateDiv->plaintext ?? '';
                     // In case of a Local deal, there is no date, but we can use
                     // this case for other reason (like date not in the last field)
                     if ($this->contains($itemDate, $this->i8n('localdeal'))) {
@@ -482,12 +481,12 @@ HEREDOC;
             ]
         );
         if ($deal->find('span[class*=' . $selector . ']', 0) != null) {
-            return '<div>'
-                . $deal->find('span[class*=' . $selector . ']', 0)->children(2)->plaintext
-                . '</div>';
-        } else {
-            return '';
+            $children = $deal->find('span[class*=' . $selector . ']', 0)->children(2);
+            if ($children) {
+                return '<div>' . $children->plaintext . '</div>';
+            }
         }
+        return '';
     }
 
     /**
@@ -593,9 +592,7 @@ HEREDOC;
                 return $this->i8n('bridge-name') . ' - ' . $this->i8n('title-keyword') . ' : ' . $this->getInput('q');
                 break;
             case $this->i8n('context-group'):
-                $values = $this->getParameters()[$this->i8n('context-group')]['group']['values'];
-                $group = array_search($this->getInput('group'), $values);
-                return $this->i8n('bridge-name') . ' - ' . $this->i8n('title-group') . ' : ' . $group;
+                return $this->i8n('bridge-name') . ' - ' . $this->i8n('title-group') . ' : ' . $this->getKey('group');
                 break;
             case $this->i8n('context-talk'):
                 return $this->i8n('bridge-name') . ' - ' . $this->i8n('title-talk') . ' : ' . $this->getTalkTitle();

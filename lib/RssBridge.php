@@ -2,6 +2,9 @@
 
 final class RssBridge
 {
+    private static HttpClient $httpClient;
+    private static CacheInterface $cache;
+
     public function main(array $argv = [])
     {
         if ($argv) {
@@ -14,7 +17,7 @@ final class RssBridge
         try {
             $this->run($request);
         } catch (\Throwable $e) {
-            Logger::error('Exception in main', ['e' => $e]);
+            Logger::error(sprintf('Exception in RssBridge::main(): %s', create_sane_exception_message($e)), ['e' => $e]);
             http_response_code(500);
             print render(__DIR__ . '/../templates/error.html.php', ['e' => $e]);
         }
@@ -34,10 +37,15 @@ final class RssBridge
             if ((error_reporting() & $code) === 0) {
                 return false;
             }
-            $text = sprintf('%s at %s line %s', $message, trim_path_prefix($file), $line);
-            // Drop the current frame
+            $text = sprintf(
+                '%s at %s line %s',
+                sanitize_root($message),
+                sanitize_root($file),
+                $line
+            );
             Logger::warning($text);
             if (Debug::isEnabled()) {
+                // todo: extract to log handler
                 print sprintf("<pre>%s</pre>\n", e($text));
             }
         });
@@ -47,14 +55,15 @@ final class RssBridge
             $error = error_get_last();
             if ($error) {
                 $message = sprintf(
-                    'Fatal Error %s: %s in %s line %s',
+                    '(shutdown) %s: %s in %s line %s',
                     $error['type'],
-                    $error['message'],
-                    trim_path_prefix($error['file']),
+                    sanitize_root($error['message']),
+                    sanitize_root($error['file']),
                     $error['line']
                 );
                 Logger::error($message);
                 if (Debug::isEnabled()) {
+                    // todo: extract to log handler
                     print sprintf("<pre>%s</pre>\n", e($message));
                 }
             }
@@ -63,8 +72,13 @@ final class RssBridge
         // Consider: ini_set('error_reporting', E_ALL & ~E_DEPRECATED);
         date_default_timezone_set(Configuration::getConfig('system', 'timezone'));
 
-        $authenticationMiddleware = new AuthenticationMiddleware();
+        $cacheFactory = new CacheFactory();
+
+        self::$httpClient = new CurlHttpClient();
+        self::$cache = $cacheFactory->create();
+
         if (Configuration::getConfig('authentication', 'enable')) {
+            $authenticationMiddleware = new AuthenticationMiddleware();
             $authenticationMiddleware();
         }
 
@@ -91,5 +105,15 @@ final class RssBridge
         } elseif ($response instanceof Response) {
             $response->send();
         }
+    }
+
+    public static function getHttpClient(): HttpClient
+    {
+        return self::$httpClient;
+    }
+
+    public static function getCache(): CacheInterface
+    {
+        return self::$cache;
     }
 }
