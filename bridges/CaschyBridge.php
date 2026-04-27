@@ -61,9 +61,11 @@ class CaschyBridge extends FeedExpander
         }
 
         foreach ($article->find('.video-container') as &$ytvideo) {
-            $ytResult = handleYoutube($ytvideo->innertext);
-            if ($ytResult) {
-                $ytvideo->innertext = $ytResult;
+            if (str_contains($ytvideo->innertext, 'youtube.com')) {
+                $ytResult = handleYoutube($ytvideo->innertext);
+                if ($ytResult) {
+                    $ytvideo->innertext = $ytResult;
+                }
             }
         }
 
